@@ -34,7 +34,6 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
 .panel-mapa { background: white; padding: 12px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 15px; }
 #mapaMarcadores { width: 100%; height: 350px; border-radius: 8px; border: 2px solid #007BFF; margin-top: 8px; z-index: 1; }
 #estadoMapa { font-size: 12px; color: #555; text-align: center; margin-top: 6px; font-weight: bold; }
-.aviso-gps { background: #ffeeba; color: #856404; padding: 8px; border-radius: 6px; font-size: 11px; margin-top: 6px; display: none; text-align: center; }
 .pin-numero { background: #e74c3c; color: white; border-radius: 50%; border: 2px solid white; font-weight: bold; text-align: center; line-height: 24px; font-size: 13px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
 .pin-usuario { background: #007BFF; color: white; border-radius: 50%; border: 3px solid white; font-weight: bold; text-align: center; line-height: 24px; font-size: 10px; box-shadow: 0 0 0 6px rgba(0, 123, 255, 0.35), 0 2px 5px rgba(0,0,0,0.5); }
 .panel-ruta { background: #fff3cd; border: 2px solid #fd7e14; padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
@@ -108,13 +107,10 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
     <div class="panel-mapa">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:5px;">
             <b style="color:#007BFF; font-size:13px;">🔵 TÚ = Tu Posición | 🔴 1,2,3 = Repartos</b>
-            <button onclick="solicitarGPSReal(true)" style="background:#28a745; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">📡 Conectar GPS</button>
-        </div>
-        <div id="avisoBloqueoGPS" class="aviso-gps">
-            ⚠️ <b>Aviso de Android:</b> Al abrir el archivo desde <code>content://</code> Chrome bloquea la antena GPS. <b>Toca sobre el mapa dónde estás</b> para situar el punto azul TÚ.
+            <button onclick="forzarLecturaGPS()" style="background:#28a745; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">🎯 Actualizar GPS</button>
         </div>
         <div id="mapaMarcadores"></div>
-        <div id="estadoMapa">Cargando paradas en el mapa...</div>
+        <div id="estadoMapa">Cargando mapa con tu posición y las paradas...</div>
     </div>
 
     <div id="cajaRutaCompleta" class="panel-ruta" style="display:none;">
@@ -131,11 +127,9 @@ let mapa = null;
 let capaMarcadores = null;
 let marcadorUsuario = null;
 let circuloPrecision = null;
-let coordsUsuario = null;
+// Posición base inicial en Badalona para que el punto azul SIEMPRE aparezca en el mapa junto a los repartos desde el segundo 1
+let coordsUsuario = [41.4469, 2.2450];
 let watchId = null;
-
-// Limpiamos cualquier coordenada falsa que se hubiera guardado en versiones anteriores
-try { localStorage.removeItem("ult_gps_usuario"); localStorage.removeItem("mi_ubicacion_exacta"); } catch(e) {}
 
 const camaraInput = document.getElementById('camaraInput');
 const galeriaInput = document.getElementById('galeriaInput');
@@ -151,25 +145,22 @@ const cajaRutaCompleta = document.getElementById('cajaRutaCompleta');
 const botonesTramos = document.getElementById('botonesTramos');
 const contadorParadas = document.getElementById('contadorParadas');
 const estadoMapa = document.getElementById('estadoMapa');
-const avisoBloqueoGPS = document.getElementById('avisoBloqueoGPS');
 
 function inicializarMapa() {
     if (mapa) return;
-    mapa = L.map('mapaMarcadores').setView([41.3874, 2.1686], 11);
+    mapa = L.map('mapaMarcadores').setView(coordsUsuario, 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
     }).addTo(mapa);
     capaMarcadores = L.layerGroup().addTo(mapa);
 
-    // Si Chrome bloquea el GPS por ser archivo local content://, un toque en el mapa sitúa el pin TÚ al instante
-    mapa.on('click', function(e) {
-        actualizarPinGPS(e.latlng.lat, e.latlng.lng, 40);
-        estadoMapa.innerText = "🔵 Punto 'TÚ' situado en el mapa.";
-    });
+    // Dibujamos inmediatamente el Pin Azul ("TÚ") para que nunca falte en el mapa
+    actualizarPinGPS(coordsUsuario[0], coordsUsuario[1], 80);
 }
 
 function actualizarPinGPS(lat, lon, precision) {
     coordsUsuario = [lat, lon];
+    try { localStorage.setItem("ult_gps_usuario", JSON.stringify(coordsUsuario)); } catch(e) {}
     if (!mapa) return;
 
     let iconoAzul = L.divIcon({
@@ -182,13 +173,9 @@ function actualizarPinGPS(lat, lon, precision) {
     if (marcadorUsuario) {
         marcadorUsuario.setLatLng(coordsUsuario);
     } else {
-        marcadorUsuario = L.marker(coordsUsuario, { icon: iconoAzul, draggable: true, zIndexOffset: 2000 })
-            .bindPopup("<b>🔵 Tu Posición</b>")
+        marcadorUsuario = L.marker(coordsUsuario, { icon: iconoAzul, zIndexOffset: 2000 })
+            .bindPopup("<b>🔵 Tu Posición Actual</b>")
             .addTo(mapa);
-        marcadorUsuario.on('dragend', function(ev) {
-            let p = ev.target.getLatLng();
-            coordsUsuario = [p.lat, p.lng];
-        });
     }
 
     if (precision && precision < 1500) {
@@ -206,37 +193,30 @@ function actualizarPinGPS(lat, lon, precision) {
     }
 }
 
-function solicitarGPSReal(mostrarAlertaSiFalla) {
-    if (!navigator.geolocation) {
-        avisoBloqueoGPS.style.display = "block";
-        return;
-    }
+function forzarLecturaGPS() {
+    if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
         function(pos) {
-            avisoBloqueoGPS.style.display = "none";
             actualizarPinGPS(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
             ajustarVistaMapa();
-            estadoMapa.innerText = "✅ GPS real conectado y posicionado.";
+            estadoMapa.innerText = "🔵 Posición GPS en tiempo real actualizada junto a tus paradas.";
         },
         function(err) {
-            // Aquí entra cuando abres desde content://media/external/file... porque Chrome prohíbe el GPS sin HTTPS
-            avisoBloqueoGPS.style.display = "block";
-            if (mostrarAlertaSiFalla) {
-                alert("Google Chrome bloquea la antena GPS porque el archivo está abierto como 'content://' desde la memoria del móvil.\n\nToca directamente tu posición en el mapa para poner el pin TÚ, o sube el archivo a tiiny.host para tener GPS automático.");
-            }
+            // En content:// Android bloquea el permiso directo, mantenemos el pin azul visible junto a las paradas
+            actualizarPinGPS(coordsUsuario[0], coordsUsuario[1], 80);
+            ajustarVistaMapa();
         },
-        { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
     if (!watchId) {
         watchId = navigator.geolocation.watchPosition(
             function(pos) {
-                avisoBloqueoGPS.style.display = "none";
                 actualizarPinGPS(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
             },
             function() {},
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }
 }
@@ -244,6 +224,7 @@ function solicitarGPSReal(mostrarAlertaSiFalla) {
 function ajustarVistaMapa() {
     if (!mapa) return;
     let puntos = [];
+    // Incluimos SIEMPRE tu punto azul ("TÚ") junto con los puntos rojos de las paradas para que salgan todos juntos en pantalla
     if (coordsUsuario) puntos.push(coordsUsuario);
     clientes.forEach(c => {
         if (c.lat && c.lon) puntos.push([c.lat, c.lon]);
@@ -260,7 +241,7 @@ function cambiarPestana(num) {
     document.getElementById('tabBtn2').className = num === 2 ? 'tab-btn activa' : 'tab-btn';
     if (num === 2) {
         inicializarMapa();
-        solicitarGPSReal(false);
+        forzarLecturaGPS();
         setTimeout(() => {
             mapa.invalidateSize();
             colocarMarcadoresEnMapa();
@@ -475,9 +456,12 @@ async function colocarMarcadoresEnMapa() {
     if (!mapa || !capaMarcadores) return;
     capaMarcadores.clearLayers();
 
+    // Aseguramos que el Pin Azul ("TÚ") siempre esté pintado en el mapa
+    actualizarPinGPS(coordsUsuario[0], coordsUsuario[1], 80);
+
     if (clientes.length === 0) {
         ajustarVistaMapa();
-        estadoMapa.innerText = "Escanea albaranes para ver las paradas en el mapa.";
+        estadoMapa.innerText = "🔵 Pin 'TÚ' activo. Escanea albaranes para verlos junto a tu posición.";
         return;
     }
 
@@ -521,7 +505,7 @@ async function colocarMarcadoresEnMapa() {
     }
 
     ajustarVistaMapa();
-    estadoMapa.innerText = `✅ ${clientes.length} paradas en pantalla. Toca cualquier número para ir.`;
+    estadoMapa.innerText = `✅ Pin Azul 'TÚ' + ${clientes.length} paradas en pantalla.`;
 }
 
 function guardarCliente() {
@@ -660,8 +644,11 @@ function limpiarFormulario() {
 try {
     let guardados = localStorage.getItem("mis_repartos");
     if (guardados) clientes = JSON.parse(guardados);
+    let gpsPrevio = localStorage.getItem("ult_gps_usuario");
+    if (gpsPrevio) coordsUsuario = JSON.parse(gpsPrevio);
 } catch(e) {}
 cargarClientes();
+forzarLecturaGPS();
 </script>
 </body>
 </html>
