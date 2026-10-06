@@ -36,13 +36,23 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
 #mapaMarcadores { width: 100%; height: 350px; border-radius: 8px; border: 2px solid #007BFF; margin-top: 8px; z-index: 1; }
 #estadoMapa { font-size: 12px; color: #555; text-align: center; margin-top: 6px; font-weight: bold; }
 .pin-numero { background: #e74c3c; color: white; border-radius: 50%; border: 2px solid white; font-weight: bold; text-align: center; line-height: 24px; font-size: 13px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+.pin-hecho { background: #28a745; color: white; border-radius: 50%; border: 2px solid white; font-weight: bold; text-align: center; line-height: 24px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); opacity: 0.85; }
 .pin-usuario { background: #007BFF; color: white; border-radius: 50%; border: 3px solid white; font-weight: bold; text-align: center; line-height: 24px; font-size: 10px; box-shadow: 0 0 0 6px rgba(0, 123, 255, 0.35), 0 2px 5px rgba(0,0,0,0.5); }
 .panel-ruta { background: #fff3cd; border: 2px solid #fd7e14; padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
 .btn-ruta-completa { background: #fd7e14; color: white; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: bold; text-decoration: none; display: block; width: 100%; box-sizing: border-box; margin-top: 8px; }
-.cliente-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; border-left: 6px solid #007BFF; }
-.cliente-card h4 { margin: 0 0 8px 0; color: #007BFF; }
+.cliente-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; border-left: 6px solid #007BFF; transition: all 0.2s; }
+.cliente-card.entregado { border-left: 6px solid #28a745; background: #f0fff4; opacity: 0.85; }
+.cabecera-card { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cabecera-card h4 { margin: 0; color: #007BFF; font-size: 15px; flex: 1; }
+.cliente-card.entregado .cabecera-card h4 { color: #28a745; text-decoration: line-through; }
+.botones-orden { display: flex; gap: 4px; }
+.btn-orden { background: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; padding: 5px 9px; font-size: 14px; cursor: pointer; font-weight: bold; }
+.btn-orden:disabled { opacity: 0.35; cursor: default; }
 .cliente-card p { margin: 4px 0; font-size: 13px; color: #555; white-space: pre-wrap; }
-.card-acciones { display: flex; gap: 8px; margin-top: 10px; }
+.btn-estado-entrega { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 8px; }
+.btn-estado-pendiente { background: #e2e3e5; color: #333; border: 1px solid #ccc; }
+.btn-estado-completado { background: #28a745; color: white; }
+.card-acciones { display: flex; gap: 8px; margin-top: 8px; }
 .btn-card { flex: 1; padding: 8px; border: none; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; }
 .btn-mapa { background: #17a2b8; color: white; }
 .btn-editar { background: #ffc107; color: #333; }
@@ -103,11 +113,11 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
     </div>
 </div>
 
-<!-- PESTAÑA 2: MAPA CON TU POSICIÓN Y MARCADORES -->
+<!-- PESTAÑA 2: MAPA CON TU POSICIÓN, ORDEN Y MARCADORES -->
 <div id="pestana2" class="seccion-tab">
     <div class="panel-mapa">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:5px;">
-            <b style="color:#007BFF; font-size:13px;">🔵 TÚ = Tu GPS | 🔴 1,2,3 = Repartos</b>
+            <b style="color:#007BFF; font-size:12px;">🔵 TÚ | 🔴 Pendiente | 🟢 Entregado</b>
             <button type="button" id="btnRefrescarGPS" style="background:#28a745; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">📡 Mi GPS</button>
         </div>
         <div id="mapaMarcadores"></div>
@@ -115,7 +125,7 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
     </div>
 
     <div id="cajaRutaCompleta" class="panel-ruta" style="display:none;">
-        <b style="color:#d9534f; font-size:14px;">🗺️ Ruta por tramos en Google Maps:</b>
+        <b id="tituloRutaTramos" style="color:#d9534f; font-size:14px;">🗺️ Ruta en Google Maps (Paradas Pendientes):</b>
         <div id="botonesTramos"></div>
     </div>
 
@@ -142,11 +152,11 @@ const inputTelefono = document.getElementById('telefono');
 const inputTexto = document.getElementById('textoExtraido');
 const contenedorClientes = document.getElementById('contenedor-clientes');
 const cajaRutaCompleta = document.getElementById('cajaRutaCompleta');
+const tituloRutaTramos = document.getElementById('tituloRutaTramos');
 const botonesTramos = document.getElementById('botonesTramos');
 const contadorParadas = document.getElementById('contadorParadas');
 const estadoMapa = document.getElementById('estadoMapa');
 
-// Conexión directa de todos los botones para evitar bloqueos en GitHub
 document.getElementById('tabBtn1').addEventListener('click', () => cambiarPestana(1));
 document.getElementById('tabBtn2').addEventListener('click', () => cambiarPestana(2));
 document.getElementById('btnGuardar').addEventListener('click', guardarCliente);
@@ -156,7 +166,6 @@ document.getElementById('btnRefrescarGPS').addEventListener('click', () => solic
 camaraInput.addEventListener('change', manejarArchivo);
 galeriaInput.addEventListener('change', manejarArchivo);
 
-// Almacenamiento blindado compatible con GitHub Pages y navegadores restringidos
 function guardarEnAlmacenamiento() {
     let textoJSON = JSON.stringify(clientes);
     try { localStorage.setItem("repartos_github_v1", textoJSON); } catch(e) {}
@@ -274,7 +283,7 @@ function cambiarPestana(num) {
         solicitarGPSReal(false);
         setTimeout(() => {
             if (mapa) mapa.invalidateSize();
-            colocarMarcadoresEnMapa();
+            colocarMarcadoresEnMapa(true);
         }, 200);
     }
 }
@@ -325,8 +334,9 @@ function extraerSoloCodigoPostal(texto) {
 function limpiarCalleParaMapa(calle) {
     if (!calle) return "";
     let limpia = calle;
-    limpia = limpia.replace(/[\[\(]?\b(?:n[º°ª\.\*]\vert{}num\.?\vert{}núm\.?)\s*[\]\)]?\s*(\d+)/gi, ' $1');
-    limpia = limpia.replace(/[\[\(]?\b(?:n[º°ª\.\*]\vert{}num\.?\vert{}núm\.?)\s*[\]\)]?/gi, ' ');     limpia = limpia.replace(/[\[\]]/g, ' ');
+    limpia = limpia.replace(/[\[\(]?\b(?:n[º°ª\.\*]|num\.?|núm\.?)\s*[\]\)]?\s*(\d+)/gi, ' $1');
+    limpia = limpia.replace(/[\[\(]?\b(?:n[º°ª\.\*]|num\.?|núm\.?)\s*[\]\)]?/gi, ' ');
+    limpia = limpia.replace(/[\[\]]/g, ' ');
     limpia = limpia.replace(/\b(bis|piso|pta|puerta|esc|escalera|bajos|bjs|entlo|entresuelo|atico|ático|bloque|blq|loc|local)\b.*$/i, '');
     limpia = limpia.replace(/(\b\d+\s+)+\d+\s*[\-\/]\s*\d+.*$/g, '$1');
     limpia = limpia.replace(/\b\d+\s*[º°ª]\s*([a-zA-Z0-9]+\s*[ªº°]?)?$/g, '');
@@ -479,12 +489,36 @@ async function geocodificarDireccion(c) {
     return null;
 }
 
-async function colocarMarcadoresEnMapa() {
+// Subir o bajar una parada en la lista para cambiar la ruta
+function moverParada(index, direccionMovimiento) {
+    let nuevoIndex = index + direccionMovimiento;
+    if (nuevoIndex < 0 || nuevoIndex >= clientes.length) return;
+
+    let temp = clientes[index];
+    clientes[index] = clientes[nuevoIndex];
+    clientes[nuevoIndex] = temp;
+
+    guardarEnAlmacenamiento();
+    cargarClientes();
+    colocarMarcadoresEnMapa(false);
+}
+
+// Marcar o desmarcar una parada como entregada
+window.alternarHecho = function(id) {
+    let c = clientes.find(x => x.id === id);
+    if (!c) return;
+    c.hecho = !c.hecho;
+    guardarEnAlmacenamiento();
+    cargarClientes();
+    colocarMarcadoresEnMapa(false);
+};
+
+async function colocarMarcadoresEnMapa(reajustarZoom = true) {
     if (!mapa || !capaMarcadores) return;
     capaMarcadores.clearLayers();
 
     if (clientes.length === 0) {
-        ajustarVistaMapa();
+        if (reajustarZoom) ajustarVistaMapa();
         estadoMapa.innerText = coordsUsuario ? "🔵 Tu GPS está activo en el mapa." : "Esperando señal GPS...";
         return;
     }
@@ -507,20 +541,24 @@ async function colocarMarcadoresEnMapa() {
 
         if (c.lat && c.lon) {
             let iconoNumero = L.divIcon({
-                className: 'pin-numero',
-                html: `${i + 1}`,
+                className: c.hecho ? 'pin-hecho' : 'pin-numero',
+                html: c.hecho ? `✓${i + 1}` : `${i + 1}`,
                 iconSize: [28, 28],
                 iconAnchor: [14, 14]
             });
 
             let urlNav = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(dirMapa);
+            let textoBotonHecho = c.hecho ? "↩️ Desmarcar Entregado" : "✅ Marcar como Entregado";
+            let colorBotonHecho = c.hecho ? "#6c757d" : "#007BFF";
+
             let popupHTML = `
-                <div style="font-size:13px; line-height:1.4;">
-                    <b>#${i + 1} - ${c.nombre || "Cliente"}</b><br>
+                <div style="font-size:13px; line-height:1.4; min-width:170px;">
+                    <b>#${i + 1} - ${c.nombre || "Cliente"}</b> ${c.hecho ? '<span style="color:#28a745;">(HECHO)</span>' : ''}<br>
                     📍 ${c.direccion || ""}<br>
                     📮 CP: ${c.poblacion || ""}<br>
                     📞 <a href="tel:${c.telefono || ''}">${c.telefono || "Sin teléfono"}</a><br>
-                    <a href="${urlNav}" target="_blank" style="display:inline-block; margin-top:6px; background:#28a745; color:white; padding:6px 10px; border-radius:4px; text-decoration:none; font-weight:bold;">🚀 Navegar aquí en Google Maps</a>
+                    <button type="button" onclick="alternarHecho(${c.id})" style="width:100%; margin-top:6px; background:${colorBotonHecho}; color:white; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">${textoBotonHecho}</button>
+                    <a href="${urlNav}" target="_blank" style="display:block; text-align:center; margin-top:5px; background:#28a745; color:white; padding:6px; border-radius:4px; text-decoration:none; font-weight:bold;">🚀 Ir en Google Maps</a>
                 </div>
             `;
 
@@ -528,8 +566,9 @@ async function colocarMarcadoresEnMapa() {
         }
     }
 
-    ajustarVistaMapa();
-    estadoMapa.innerText = `✅ ${clientes.length} paradas en el mapa junto a tu posición.`;
+    if (reajustarZoom) ajustarVistaMapa();
+    let pendientesCount = clientes.filter(x => !x.hecho).length;
+    estadoMapa.innerText = `✅ ${pendientesCount} pendientes de ${clientes.length} paradas totales.`;
 }
 
 function guardarCliente() {
@@ -537,13 +576,16 @@ function guardarCliente() {
     let cpGuardado = extraerSoloCodigoPostal(inputPoblacion.value) || inputPoblacion.value.trim();
     let direccionSinSimboloNumero = limpiarCalleParaMapa(inputDireccion.value);
 
+    let existente = id !== "" ? clientes.find(c => c.id === Number(id)) : null;
+
     let item = {
         id: id === "" ? Date.now() : Number(id),
         nombre: inputNombre.value.trim(),
         direccion: direccionSinSimboloNumero,
         poblacion: cpGuardado,
         telefono: inputTelefono.value.trim(),
-        texto: inputTexto.value.trim()
+        texto: inputTexto.value.trim(),
+        hecho: existente ? existente.hecho : false
     };
 
     if (!item.nombre && !item.direccion && !item.texto) {
@@ -566,7 +608,8 @@ function guardarCliente() {
 
 function cargarClientes() {
     contenedorClientes.innerHTML = "";
-    contadorParadas.innerText = clientes.length;
+    let pendientes = clientes.filter(c => !c.hecho).length;
+    contadorParadas.innerText = `${pendientes}/${clientes.length}`;
 
     if (clientes.length === 0) {
         cajaRutaCompleta.style.display = "none";
@@ -574,47 +617,64 @@ function cargarClientes() {
         return;
     }
 
-    let paradasLimpias = [];
+    let paradasPendientesRuta = [];
 
     clientes.forEach((c, idx) => {
         let calleLimpia = limpiarCalleParaMapa(c.direccion || "");
         c.direccion = calleLimpia;
         let dirMapa = obtenerDireccionParaMapa(c);
-        if (dirMapa) paradasLimpias.push(dirMapa);
+        // Solo añadimos a la ruta de Google Maps los repartos que AÚN NO están hechos
+        if (dirMapa && !c.hecho) {
+            paradasPendientesRuta.push({ num: idx + 1, dir: dirMapa });
+        }
         
         let urlIndividual = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(dirMapa);
 
         let card = document.createElement('div');
-        card.className = 'cliente-card';
+        card.className = c.hecho ? 'cliente-card entregado' : 'cliente-card';
         card.innerHTML = `
-            <h4>Parada #${idx + 1} - 👤 ${c.nombre || "Albarán"}</h4>
+            <div class="cabecera-card">
+                <h4>Parada #${idx + 1} - 👤 ${c.nombre || "Albarán"}</h4>
+                <div class="botones-orden">
+                    <button type="button" class="btn-orden btn-subir" ${idx === 0 ? 'disabled' : ''} title="Subir parada">⬆️</button>
+                    <button type="button" class="btn-orden btn-bajar" ${idx === clientes.length - 1 ? 'disabled' : ''} title="Bajar parada">⬇️</button>
+                </div>
+            </div>
             <p>📍 <b>Calle limpia:</b> ${calleLimpia}</p>
             <p>📮 <b>Código Postal:</b> ${c.poblacion}</p>
             <p>🗺️ <b>Búsqueda Maps:</b> ${dirMapa}</p>
             <p>📞 <b>Teléfono:</b> ${c.telefono}</p>
             <p style="background:#eee; padding:6px; border-radius:4px;">📄 <b>Texto extraído:</b>\n${c.texto}</p>
+            <button type="button" class="btn-estado-entrega ${c.hecho ? 'btn-estado-completado' : 'btn-estado-pendiente'}">
+                ${c.hecho ? '✅ ENTREGADO (Pulsa para desmarcar)' : '⬜ MARCAR COMO ENTREGADO'}
+            </button>
             <div class="card-acciones">
                 <a class="btn-card btn-mapa" href="${urlIndividual}" target="_blank">🚀 Ir en Maps</a>
                 <button class="btn-card btn-editar" type="button">✏️ Editar</button>
                 <button class="btn-card btn-borrar" type="button">🗑️ Borrar</button>
             </div>
         `;
+
+        card.querySelector('.btn-subir').addEventListener('click', () => moverParada(idx, -1));
+        card.querySelector('.btn-bajar').addEventListener('click', () => moverParada(idx, 1));
+        card.querySelector('.btn-estado-entrega').addEventListener('click', () => alternarHecho(c.id));
         card.querySelector('.btn-editar').addEventListener('click', () => editarCliente(c.id));
         card.querySelector('.btn-borrar').addEventListener('click', () => borrarCliente(c.id));
         contenedorClientes.appendChild(card);
     });
 
-    if (paradasLimpias.length > 0) {
-        botonesTramos.innerHTML = "";
+    botonesTramos.innerHTML = "";
+    if (paradasPendientesRuta.length > 0) {
+        tituloRutaTramos.innerText = `🗺️ Ruta en Google Maps (${paradasPendientesRuta.length} pendientes en orden):`;
         let tamanoTramo = 9;
 
-        for (let i = 0; i < paradasLimpias.length; i += tamanoTramo) {
-            let grupo = paradasLimpias.slice(i, i + tamanoTramo);
-            let rutaSlashes = grupo.map(p => encodeURIComponent(p.replace(/\//g, ' '))).join('/');
+        for (let i = 0; i < paradasPendientesRuta.length; i += tamanoTramo) {
+            let grupo = paradasPendientesRuta.slice(i, i + tamanoTramo);
+            let rutaSlashes = grupo.map(p => encodeURIComponent(p.dir.replace(/\//g, ' '))).join('/');
             let urlTramo = "https://www.google.com/maps/dir//" + rutaSlashes;
             
-            let inicioNum = i + 1;
-            let finNum = i + grupo.length;
+            let primeraParada = grupo[0].num;
+            let ultimaParada = grupo[grupo.length - 1].num;
             let numTramo = Math.floor(i / tamanoTramo) + 1;
 
             let boton = document.createElement('a');
@@ -622,16 +682,17 @@ function cargarClientes() {
             boton.href = urlTramo;
             boton.target = '_blank';
             
-            if (paradasLimpias.length <= 9) {
-                boton.innerText = `🚀 Abrir Ruta Completa en Google Maps (${paradasLimpias.length} paradas)`;
+            if (paradasPendientesRuta.length <= 9) {
+                boton.innerText = `🚀 Iniciar Ruta de Pendientes (${paradasPendientesRuta.length} paradas)`;
             } else {
-                boton.innerText = `🚀 Tramo ${numTramo}: Paradas ${inicioNum} a ${finNum} en Google Maps`;
+                boton.innerText = `🚀 Tramo ${numTramo}: Paradas #${primeraParada} a #${ultimaParada} en Maps`;
             }
             botonesTramos.appendChild(boton);
         }
         cajaRutaCompleta.style.display = "block";
     } else {
-        cajaRutaCompleta.style.display = "none";
+        tituloRutaTramos.innerText = "🎉 ¡Todos los repartos están entregados!";
+        cajaRutaCompleta.style.display = "block";
     }
 }
 
@@ -652,7 +713,7 @@ function borrarCliente(id) {
     clientes = clientes.filter(x => x.id !== id);
     guardarEnAlmacenamiento();
     cargarClientes();
-    colocarMarcadoresEnMapa();
+    colocarMarcadoresEnMapa(false);
 }
 
 function limpiarFormulario() {
