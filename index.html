@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Albaranes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+.tabs { display: flex; width: 100%; max-width: 500px; margin-bottom: 15px; gap: 8px; }
+.tab-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; background: #ddd; color: #333; font-weight: bold; font-size: 14px; cursor: pointer; }
+.tab-btn.activa { background: #007BFF; color: white; }
+.seccion-tab { width: 100%; max-width: 500px; display: none; }
+.seccion-tab.activa { display: block; }
+.container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; margin-bottom: 20px; }
+h2, h3 { text-align: center; color: #333; margin-top: 0; }
+input[type="file"] { display: none; }
+.grupo-botones-carga { display: flex; gap: 10px; margin-bottom: 15px; }
+.btn-carga { flex: 1; color: white; padding: 12px 10px; border-radius: 8px; font-size: 14px; cursor: pointer; text-align: center; font-weight: bold; }
+.btn-camara { background: #007BFF; }
+.btn-galeria { background: #6610f2; }
+#estado { text-align: center; margin: 10px 0; font-weight: bold; color: #555; font-size: 14px; }
+.form-group { margin-bottom: 12px; }
+label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; font-family: Arial, sans-serif; }
+.campo-azul { border-left: 5px solid #007BFF; }
+.campo-amarillo { border-left: 5px solid #f1c40f; }
+.campo-rojo { border-left: 5px solid #e74c3c; }
+.campo-lila { border-left: 5px solid #9b59b6; }
+.btn-accion { padding: 12px; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; box-sizing: border-box; }
+.btn-guardar { background: #28a745; color: white; }
+.btn-limpiar { background: #6c757d; color: white; }
+.panel-mapa { background: white; padding: 12px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 15px; }
+#mapaMarcadores { width: 100%; height: 350px; border-radius: 8px; border: 2px solid #007BFF; margin-top: 8px; z-index: 1; }
+#estadoMapa { font-size: 12px; color: #555; text-align: center; margin-top: 6px; font-weight: bold; }
+.aviso-gps { background: #ffeeba; color: #856404; padding: 8px; border-radius: 6px; font-size: 11px; margin-top: 6px; display: none; text-align: center; }
+.pin-numero { background: #e74c3c; color: white; border-radius: 50%; border: 2px solid white; font-weight: bold; text-align: center; line-height: 24px; font-size: 13px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+.pin-usuario { background: #007BFF; color: white; border-radius: 50%; border: 3px solid white; font-weight: bold; text-align: center; line-height: 24px; font-size: 10px; box-shadow: 0 0 0 6px rgba(0, 123, 255, 0.35), 0 2px 5px rgba(0,0,0,0.5); }
+.panel-ruta { background: #fff3cd; border: 2px solid #fd7e14; padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
+.btn-ruta-completa { background: #fd7e14; color: white; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: bold; text-decoration: none; display: block; width: 100%; box-sizing: border-box; margin-top: 8px; }
+.cliente-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; border-left: 6px solid #007BFF; }
+.cliente-card h4 { margin: 0 0 8px 0; color: #007BFF; }
+.cliente-card p { margin: 4px 0; font-size: 13px; color: #555; white-space: pre-wrap; }
+.card-acciones { display: flex; gap: 8px; margin-top: 10px; }
+.btn-card { flex: 1; padding: 8px; border: none; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; }
+.btn-mapa { background: #17a2b8; color: white; }
+.btn-editar { background: #ffc107; color: #333; }
+.btn-borrar { background: #dc3545; color: white; }
+</style>
+</head>
+<body>
+
+<div class="tabs">
+    <button id="tabBtn1" class="tab-btn activa" onclick="cambiarPestana(1)">➕ Escanear Albarán</button>
+    <button id="tabBtn2" class="tab-btn" onclick="cambiarPestana(2)">📍 Mapa y Repartos (<span id="contadorParadas">0</span>)</button>
+</div>
+
+<!-- PESTAÑA 1: ESCANEAR Y GUARDAR -->
+<div id="pestana1" class="seccion-tab activa">
+    <div class="container">
+        <h2>Gestor de Albaranes</h2>
+        
+        <div class="grupo-botones-carga">
+            <label for="camaraInput" class="btn-carga btn-camara">📸 Hacer Foto</label>
+            <label for="galeriaInput" class="btn-carga btn-galeria">📁 Abrir Galería</label>
+        </div>
+
+        <input type="file" id="camaraInput" accept="image/*" capture="environment">
+        <input type="file" id="galeriaInput" accept="image/*">
+
+        <div id="estado">Listo para escanear o seleccionar...</div>
+
+        <input type="hidden" id="edit-id" value="">
+
+        <div class="form-group">
+            <label style="color: #007BFF;">Nombre y Apellidos:</label>
+            <input type="text" id="nombre" class="campo-azul">
+        </div>
+
+        <div class="form-group">
+            <label style="color: #d4ac0d;">Dirección de Entrega (Calle y Nº):</label>
+            <input type="text" id="direccion" class="campo-amarillo">
+        </div>
+
+        <div class="form-group">
+            <label style="color: #e74c3c;">Código Postal (4 o 5 dígitos):</label>
+            <input type="text" id="poblacion" class="campo-rojo" placeholder="Ej: 08901 o 8901">
+        </div>
+
+        <div class="form-group">
+            <label style="color: #9b59b6;">Teléfono:</label>
+            <input type="text" id="telefono" class="campo-lila">
+        </div>
+
+        <div class="form-group">
+            <label style="color: #555;">Texto Extraído Completo:</label>
+            <textarea id="textoExtraido" rows="3"></textarea>
+        </div>
+
+        <button class="btn-accion btn-guardar" onclick="guardarCliente()">💾 Guardar en Hoja de Ruta</button>
+        <button class="btn-accion btn-limpiar" onclick="limpiarFormulario()">🔄 Nuevo / Limpiar</button>
+    </div>
+</div>
+
+<!-- PESTAÑA 2: MAPA CON TU POSICIÓN Y MARCADORES -->
+<div id="pestana2" class="seccion-tab">
+    <div class="panel-mapa">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:5px;">
+            <b style="color:#007BFF; font-size:13px;">🔵 TÚ = Tu Posición | 🔴 1,2,3 = Repartos</b>
+            <button onclick="solicitarGPSReal(true)" style="background:#28a745; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">📡 Conectar GPS</button>
+        </div>
+        <div id="avisoBloqueoGPS" class="aviso-gps">
+            ⚠️ <b>Aviso de Android:</b> Al abrir el archivo desde <code>content://</code> Chrome bloquea la antena GPS. <b>Toca sobre el mapa dónde estás</b> para situar el punto azul TÚ.
+        </div>
+        <div id="mapaMarcadores"></div>
+        <div id="estadoMapa">Cargando paradas en el mapa...</div>
+    </div>
+
+    <div id="cajaRutaCompleta" class="panel-ruta" style="display:none;">
+        <b style="color:#d9534f; font-size:14px;">🗺️ Ruta por tramos en Google Maps:</b>
+        <div id="botonesTramos"></div>
+    </div>
+
+    <div id="contenedor-clientes"></div>
+</div>
+
+<script>
+let clientes = [];
+let mapa = null;
+let capaMarcadores = null;
+let marcadorUsuario = null;
+let circuloPrecision = null;
+let coordsUsuario = null;
+let watchId = null;
+
+// Limpiamos cualquier coordenada falsa que se hubiera guardado en versiones anteriores
+try { localStorage.removeItem("ult_gps_usuario"); localStorage.removeItem("mi_ubicacion_exacta"); } catch(e) {}
+
+const camaraInput = document.getElementById('camaraInput');
+const galeriaInput = document.getElementById('galeriaInput');
+const estado =
