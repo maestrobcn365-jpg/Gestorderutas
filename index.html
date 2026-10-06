@@ -17,7 +17,7 @@ body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 
 h2, h3 { text-align: center; color: #333; margin-top: 0; }
 input[type="file"] { display: none; }
 .grupo-botones-carga { display: flex; gap: 10px; margin-bottom: 15px; }
-.btn-carga { flex: 1; color: white; padding: 12px 10px; border-radius: 8px; font-size: 14px; cursor: pointer; text-align: center; font-weight: bold; }
+.btn-carga { flex: 1; color: white; padding: 12px 10px; border-radius: 8px; font-size: 14px; cursor: pointer; text-align: center; font-weight: bold; display: block; }
 .btn-camara { background: #007BFF; }
 .btn-galeria { background: #6610f2; }
 #estado { text-align: center; margin: 10px 0; font-weight: bold; color: #555; font-size: 14px; }
@@ -28,8 +28,9 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
 .campo-amarillo { border-left: 5px solid #f1c40f; }
 .campo-rojo { border-left: 5px solid #e74c3c; }
 .campo-lila { border-left: 5px solid #9b59b6; }
-.btn-accion { padding: 12px; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; box-sizing: border-box; }
+.btn-accion { padding: 14px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; box-sizing: border-box; display: block; }
 .btn-guardar { background: #28a745; color: white; }
+.btn-guardar:active { background: #1e7e34; transform: scale(0.99); }
 .btn-limpiar { background: #6c757d; color: white; }
 .panel-mapa { background: white; padding: 12px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 15px; }
 #mapaMarcadores { width: 100%; height: 350px; border-radius: 8px; border: 2px solid #007BFF; margin-top: 8px; z-index: 1; }
@@ -51,8 +52,8 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
 <body>
 
 <div class="tabs">
-    <button id="tabBtn1" class="tab-btn activa" onclick="cambiarPestana(1)">➕ Escanear Albarán</button>
-    <button id="tabBtn2" class="tab-btn" onclick="cambiarPestana(2)">📍 Mapa y Repartos (<span id="contadorParadas">0</span>)</button>
+    <button type="button" id="tabBtn1" class="tab-btn activa">➕ Escanear Albarán</button>
+    <button type="button" id="tabBtn2" class="tab-btn">📍 Mapa y Repartos (<span id="contadorParadas">0</span>)</button>
 </div>
 
 <!-- PESTAÑA 1: ESCANEAR Y GUARDAR -->
@@ -97,8 +98,8 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
             <textarea id="textoExtraido" rows="3"></textarea>
         </div>
 
-        <button class="btn-accion btn-guardar" onclick="guardarCliente()">💾 Guardar en Hoja de Ruta</button>
-        <button class="btn-accion btn-limpiar" onclick="limpiarFormulario()">🔄 Nuevo / Limpiar</button>
+        <button type="button" id="btnGuardar" class="btn-accion btn-guardar">💾 Guardar en Hoja de Ruta</button>
+        <button type="button" id="btnLimpiar" class="btn-accion btn-limpiar">🔄 Nuevo / Limpiar</button>
     </div>
 </div>
 
@@ -106,11 +107,11 @@ input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cc
 <div id="pestana2" class="seccion-tab">
     <div class="panel-mapa">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:5px;">
-            <b style="color:#007BFF; font-size:13px;">🔵 TÚ = Tu Posición | 🔴 1,2,3 = Repartos</b>
-            <button onclick="forzarLecturaGPS()" style="background:#28a745; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">🎯 Actualizar GPS</button>
+            <b style="color:#007BFF; font-size:13px;">🔵 TÚ = Tu GPS | 🔴 1,2,3 = Repartos</b>
+            <button type="button" id="btnRefrescarGPS" style="background:#28a745; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">📡 Mi GPS</button>
         </div>
         <div id="mapaMarcadores"></div>
-        <div id="estadoMapa">Cargando mapa con tu posición y las paradas...</div>
+        <div id="estadoMapa">Obteniendo señal GPS y ubicando paradas...</div>
     </div>
 
     <div id="cajaRutaCompleta" class="panel-ruta" style="display:none;">
@@ -127,8 +128,7 @@ let mapa = null;
 let capaMarcadores = null;
 let marcadorUsuario = null;
 let circuloPrecision = null;
-// Posición base inicial en Badalona para que el punto azul SIEMPRE aparezca en el mapa junto a los repartos desde el segundo 1
-let coordsUsuario = [41.4469, 2.2450];
+let coordsUsuario = null;
 let watchId = null;
 
 const camaraInput = document.getElementById('camaraInput');
@@ -146,22 +146,55 @@ const botonesTramos = document.getElementById('botonesTramos');
 const contadorParadas = document.getElementById('contadorParadas');
 const estadoMapa = document.getElementById('estadoMapa');
 
+// Conexión directa de todos los botones para evitar bloqueos en GitHub
+document.getElementById('tabBtn1').addEventListener('click', () => cambiarPestana(1));
+document.getElementById('tabBtn2').addEventListener('click', () => cambiarPestana(2));
+document.getElementById('btnGuardar').addEventListener('click', guardarCliente);
+document.getElementById('btnLimpiar').addEventListener('click', limpiarFormulario);
+document.getElementById('btnRefrescarGPS').addEventListener('click', () => solicitarGPSReal(true));
+
+camaraInput.addEventListener('change', manejarArchivo);
+galeriaInput.addEventListener('change', manejarArchivo);
+
+// Almacenamiento blindado compatible con GitHub Pages y navegadores restringidos
+function guardarEnAlmacenamiento() {
+    let textoJSON = JSON.stringify(clientes);
+    try { localStorage.setItem("repartos_github_v1", textoJSON); } catch(e) {}
+    try { sessionStorage.setItem("repartos_github_v1", textoJSON); } catch(e) {}
+    try { window.name = textoJSON; } catch(e) {}
+}
+
+function cargarDesdeAlmacenamiento() {
+    try {
+        let d = localStorage.getItem("repartos_github_v1") || sessionStorage.getItem("repartos_github_v1") || window.name;
+        if (d && d.startsWith("[")) {
+            clientes = JSON.parse(d);
+        }
+    } catch(e) {}
+}
+
 function inicializarMapa() {
     if (mapa) return;
-    mapa = L.map('mapaMarcadores').setView(coordsUsuario, 12);
+    if (typeof L === 'undefined') {
+        estadoMapa.innerText = "Error al cargar librería del mapa. Comprueba tu conexión.";
+        return;
+    }
+    mapa = L.map('mapaMarcadores').setView([41.3874, 2.1686], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
     }).addTo(mapa);
     capaMarcadores = L.layerGroup().addTo(mapa);
 
-    // Dibujamos inmediatamente el Pin Azul ("TÚ") para que nunca falte en el mapa
-    actualizarPinGPS(coordsUsuario[0], coordsUsuario[1], 80);
+    mapa.locate({ setView: false, watch: true, enableHighAccuracy: true, maximumAge: 0 });
+    mapa.on('locationfound', function(e) {
+        actualizarPinGPS(e.latlng.lat, e.latlng.lng, e.accuracy);
+    });
 }
 
 function actualizarPinGPS(lat, lon, precision) {
+    let eraNulo = !coordsUsuario;
     coordsUsuario = [lat, lon];
-    try { localStorage.setItem("ult_gps_usuario", JSON.stringify(coordsUsuario)); } catch(e) {}
-    if (!mapa) return;
+    if (!mapa || typeof L === 'undefined') return;
 
     let iconoAzul = L.divIcon({
         className: 'pin-usuario',
@@ -174,7 +207,7 @@ function actualizarPinGPS(lat, lon, precision) {
         marcadorUsuario.setLatLng(coordsUsuario);
     } else {
         marcadorUsuario = L.marker(coordsUsuario, { icon: iconoAzul, zIndexOffset: 2000 })
-            .bindPopup("<b>🔵 Tu Posición Actual</b>")
+            .bindPopup("<b>🔵 Tu Posición Actual (GPS)</b>")
             .addTo(mapa);
     }
 
@@ -191,22 +224,20 @@ function actualizarPinGPS(lat, lon, precision) {
             }).addTo(mapa);
         }
     }
+
+    if (eraNulo) ajustarVistaMapa();
 }
 
-function forzarLecturaGPS() {
+function solicitarGPSReal(centrar) {
     if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
         function(pos) {
             actualizarPinGPS(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-            ajustarVistaMapa();
-            estadoMapa.innerText = "🔵 Posición GPS en tiempo real actualizada junto a tus paradas.";
+            if (centrar && mapa) mapa.setView([pos.coords.latitude, pos.coords.longitude], 15);
+            else ajustarVistaMapa();
         },
-        function(err) {
-            // En content:// Android bloquea el permiso directo, mantenemos el pin azul visible junto a las paradas
-            actualizarPinGPS(coordsUsuario[0], coordsUsuario[1], 80);
-            ajustarVistaMapa();
-        },
+        function() {},
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
@@ -224,7 +255,6 @@ function forzarLecturaGPS() {
 function ajustarVistaMapa() {
     if (!mapa) return;
     let puntos = [];
-    // Incluimos SIEMPRE tu punto azul ("TÚ") junto con los puntos rojos de las paradas para que salgan todos juntos en pantalla
     if (coordsUsuario) puntos.push(coordsUsuario);
     clientes.forEach(c => {
         if (c.lat && c.lon) puntos.push([c.lat, c.lon]);
@@ -241,16 +271,13 @@ function cambiarPestana(num) {
     document.getElementById('tabBtn2').className = num === 2 ? 'tab-btn activa' : 'tab-btn';
     if (num === 2) {
         inicializarMapa();
-        forzarLecturaGPS();
+        solicitarGPSReal(false);
         setTimeout(() => {
-            mapa.invalidateSize();
+            if (mapa) mapa.invalidateSize();
             colocarMarcadoresEnMapa();
         }, 200);
     }
 }
-
-camaraInput.addEventListener('change', manejarArchivo);
-galeriaInput.addEventListener('change', manejarArchivo);
 
 async function manejarArchivo(e) {
     const archivo = e.target.files[0];
@@ -456,12 +483,9 @@ async function colocarMarcadoresEnMapa() {
     if (!mapa || !capaMarcadores) return;
     capaMarcadores.clearLayers();
 
-    // Aseguramos que el Pin Azul ("TÚ") siempre esté pintado en el mapa
-    actualizarPinGPS(coordsUsuario[0], coordsUsuario[1], 80);
-
     if (clientes.length === 0) {
         ajustarVistaMapa();
-        estadoMapa.innerText = "🔵 Pin 'TÚ' activo. Escanea albaranes para verlos junto a tu posición.";
+        estadoMapa.innerText = coordsUsuario ? "🔵 Tu GPS está activo en el mapa." : "Esperando señal GPS...";
         return;
     }
 
@@ -477,7 +501,7 @@ async function colocarMarcadoresEnMapa() {
                 c.lat = coords.lat;
                 c.lon = coords.lon;
                 c.dirCacheV3 = dirMapa;
-                try { localStorage.setItem("mis_repartos", JSON.stringify(clientes)); } catch(e) {}
+                guardarEnAlmacenamiento();
             }
         }
 
@@ -505,7 +529,7 @@ async function colocarMarcadoresEnMapa() {
     }
 
     ajustarVistaMapa();
-    estadoMapa.innerText = `✅ Pin Azul 'TÚ' + ${clientes.length} paradas en pantalla.`;
+    estadoMapa.innerText = `✅ ${clientes.length} paradas en el mapa junto a tu posición.`;
 }
 
 function guardarCliente() {
@@ -523,7 +547,7 @@ function guardarCliente() {
     };
 
     if (!item.nombre && !item.direccion && !item.texto) {
-        alert("Escanea un albarán o escribe algo antes de guardar.");
+        estado.innerText = "⚠️ Escanea un albarán o escribe algún dato primero.";
         return;
     }
 
@@ -534,7 +558,7 @@ function guardarCliente() {
         if (i !== -1) clientes[i] = item;
     }
 
-    try { localStorage.setItem("mis_repartos", JSON.stringify(clientes)); } catch(e) {}
+    guardarEnAlmacenamiento();
     limpiarFormulario();
     cargarClientes();
     cambiarPestana(2);
@@ -575,8 +599,8 @@ function cargarClientes() {
                 <button class="btn-card btn-borrar" type="button">🗑️ Borrar</button>
             </div>
         `;
-        card.querySelector('.btn-editar').onclick = () => editarCliente(c.id);
-        card.querySelector('.btn-borrar').onclick = () => borrarCliente(c.id);
+        card.querySelector('.btn-editar').addEventListener('click', () => editarCliente(c.id));
+        card.querySelector('.btn-borrar').addEventListener('click', () => borrarCliente(c.id));
         contenedorClientes.appendChild(card);
     });
 
@@ -626,7 +650,7 @@ function editarCliente(id) {
 
 function borrarCliente(id) {
     clientes = clientes.filter(x => x.id !== id);
-    try { localStorage.setItem("mis_repartos", JSON.stringify(clientes)); } catch(e) {}
+    guardarEnAlmacenamiento();
     cargarClientes();
     colocarMarcadoresEnMapa();
 }
@@ -641,14 +665,9 @@ function limpiarFormulario() {
     estado.innerText = "Listo para escanear o seleccionar...";
 }
 
-try {
-    let guardados = localStorage.getItem("mis_repartos");
-    if (guardados) clientes = JSON.parse(guardados);
-    let gpsPrevio = localStorage.getItem("ult_gps_usuario");
-    if (gpsPrevio) coordsUsuario = JSON.parse(gpsPrevio);
-} catch(e) {}
+cargarDesdeAlmacenamiento();
 cargarClientes();
-forzarLecturaGPS();
+solicitarGPSReal(false);
 </script>
 </body>
 </html>
